@@ -163,24 +163,55 @@ def parse_transcript(transcript_path: str) -> list[dict]:
 def format_markdown(entries: list[dict], session_id: str) -> str:
     """Format parsed entries as readable Markdown."""
     lines = []
-    lines.append(f"# Session Log — {session_id[:8]}")
-    lines.append("")
 
+    # Build header with time info
     if entries:
         first_ts = entries[0].get('timestamp', '')
         last_ts = entries[-1].get('timestamp', '')
+        date_str = ''
+        start_str = ''
+        end_str = ''
+        duration_str = ''
         if first_ts:
             try:
-                dt = datetime.fromisoformat(first_ts.replace('Z', '+00:00'))
-                lines.append(f"**Started:** {dt.strftime('%Y-%m-%d %H:%M:%S')}")
+                dt_start = datetime.fromisoformat(first_ts.replace('Z', '+00:00'))
+                date_str = dt_start.strftime('%Y-%m-%d')
+                start_str = dt_start.strftime('%H:%M:%S')
             except (ValueError, TypeError):
                 pass
         if last_ts:
             try:
-                dt = datetime.fromisoformat(last_ts.replace('Z', '+00:00'))
-                lines.append(f"**Last updated:** {dt.strftime('%Y-%m-%d %H:%M:%S')}")
+                dt_end = datetime.fromisoformat(last_ts.replace('Z', '+00:00'))
+                end_str = dt_end.strftime('%H:%M:%S')
+                if first_ts:
+                    dt_start = datetime.fromisoformat(first_ts.replace('Z', '+00:00'))
+                    delta = dt_end - dt_start
+                    minutes = int(delta.total_seconds() // 60)
+                    if minutes < 1:
+                        duration_str = '<1min'
+                    elif minutes < 60:
+                        duration_str = f'{minutes}min'
+                    else:
+                        hours = minutes // 60
+                        mins = minutes % 60
+                        duration_str = f'{hours}h{mins}m'
             except (ValueError, TypeError):
                 pass
+
+        lines.append(f"# Session Log — {date_str or session_id[:8]}")
+        lines.append("")
+        if date_str:
+            lines.append(f"- **日期:** {date_str}")
+        if start_str:
+            lines.append(f"- **开始:** {start_str}")
+        if end_str:
+            lines.append(f"- **结束:** {end_str}")
+        if duration_str:
+            lines.append(f"- **时长:** {duration_str}")
+        lines.append(f"- **Session ID:** {session_id[:8]}")
+        lines.append("")
+    else:
+        lines.append(f"# Session Log — {session_id[:8]}")
         lines.append("")
 
     lines.append("---")
@@ -234,12 +265,26 @@ def main():
     markdown = format_markdown(entries, session_id)
     markdown = redact_secrets(markdown)
 
-    # Write to docs/sessions/ (use CWD — Stop hook runs in project directory)
+    # Determine timestamp for file naming and monthly archiving
+    first_ts = entries[0].get('timestamp', '') if entries else ''
+    if first_ts:
+        try:
+            dt = datetime.fromisoformat(first_ts.replace('Z', '+00:00'))
+            month_dir = dt.strftime('%Y-%m')
+            file_prefix = dt.strftime('%Y-%m-%d_%H%M')
+        except (ValueError, TypeError):
+            month_dir = datetime.now().strftime('%Y-%m')
+            file_prefix = datetime.now().strftime('%Y-%m-%d_%H%M')
+    else:
+        month_dir = datetime.now().strftime('%Y-%m')
+        file_prefix = datetime.now().strftime('%Y-%m-%d_%H%M')
+
+    # Write to docs/sessions/{YYYY-MM}/ (use CWD — Stop hook runs in project directory)
     project_root = os.getcwd()
-    output_dir = os.path.join(project_root, 'docs', 'sessions')
+    output_dir = os.path.join(project_root, 'docs', 'sessions', month_dir)
     os.makedirs(output_dir, exist_ok=True)
 
-    output_file = os.path.join(output_dir, f'{session_id[:8]}.md')
+    output_file = os.path.join(output_dir, f'{file_prefix}_{session_id[:8]}.md')
     with open(output_file, 'w') as f:
         f.write(markdown)
 
