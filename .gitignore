@@ -1,0 +1,27 @@
+# Secrets
+.env
+*.env
+.token_cache.json
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+
+# Logs & Data
+logs/
+*.log
+*.db
+*.sqlite
+
+# OS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+
+# Claude Code
+.claude/
+*.save

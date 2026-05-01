@@ -1,0 +1,3 @@
+# Session logs are local — do not commit
+*
+!.gitignore
